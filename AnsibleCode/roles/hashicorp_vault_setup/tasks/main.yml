@@ -1,0 +1,124 @@
+- name: Check if vault all ready installed
+  ansible.builtin.command: vault -version
+  register: vault_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Install Depedencies (unzip)
+  ansible.builtin.package:
+    update_cache: true
+    name: "{{ item }}"
+    state: present
+  with_items: "{{ vault_install_dependencies }}"
+  when: vault_check is failed
+
+- name: Download vault binary
+  ansible.builtin.get_url:
+    url: "{{ vault_download_url }}"
+    dest: "/tmp/vault_{{ vault_version }}_{{ vault_os }}_{{ vault_arch }}.zip"
+  when: vault_check is failed
+
+- name: Unarchive vault binary
+  ansible.builtin.unarchive:
+    src: "/tmp/vault_{{ vault_version }}_{{ vault_os }}_{{ vault_arch }}.zip"
+    dest: "{{ vault_binary_path }}"             # /usr/local/bin
+    remote_src: true
+  when: vault_check is failed
+
+- name: Set vault binary capabilities         # allow ban swap space without root permissions (disable_mlock)
+  community.general.capabilities:
+    path: /usr/local/bin/vault
+    capability: cap_ipc_lock+ep
+    state: present
+
+- name: Create vault group
+  ansible.builtin.group:
+    name: "{{ vault_group }}"
+    state: present
+
+- name: Create vault user
+  ansible.builtin.user:
+    name: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    create_home: false
+    system: true
+    shell: /sbin/nologin
+    state: present
+
+- name: Create directories for vault            # Nice loop implementation
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ vault_data_path }}"             # /opt/vault/data
+      owner: "{{ vault_user }}"
+      group: "{{ vault_group }}"
+      mode: '0700'
+    - path: "{{ vault_tls_path }}"              # /opt/vault/tls
+      owner: "{{ vault_user }}"
+      group: "{{ vault_group }}"
+      mode: '0700'
+    - path: "{{ vault_config_path | dirname }}" # /etc/vault.d/((vault.hcl))
+      owner: "{{ vault_user }}"
+      group: "{{ vault_group }}"
+      mode: '0750'
+    - path: "{{ vault_log_path }}"              # /var/log/vault
+      owner: "{{ vault_user }}"
+      group: "{{ vault_group }}"
+      mode: '0750'
+
+- name: Copy the Node-specific Vault configuration file to each node
+  ansible.builtin.copy:
+    src: "/{{ playbook_dir }}/{{ hostvars[inventory_hostname]['vault_config_file'] }}" # vault_config_file must be provided in inventory file
+    dest: "{{ vault_config_path }}"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: '0644'
+  notify: Restart Vault service
+
+- name: Copy systemd file
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/vault.service"
+    dest: "{{ vault_systemd_path }}"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: '0750'
+  notify: Restart Vault service
+
+######### COPY TLS FILES (terraform will print it) #########
+- name: Copy root (ca) cert file to each node
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/ca_root_cert.pem"
+    dest: "{{ vault_tls_path }}/ca_cert.crt"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: '0644'
+
+- name: Copy self-signed CA cert to /usr/local/share/ca-certificates + update-ca-cert
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/ca_root_cert.pem"
+    dest: /usr/local/share/ca-certificates/ca_cert.crt
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: '0644'
+  notify: 
+    - Update CA certificates
+    - Restart Vault service
+- name: Copy Node-specific TLS Certificate to each node
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/{{ hostvars[inventory_hostname]['tls_cert_file'] }}"
+    dest: "{{ vault_tls_path }}/tls.cert"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: '0644'
+
+- name: Copy Node-specific TLS private key to each node
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/{{ hostvars[inventory_hostname]['tls_key_file'] }}"
+    dest: "{{ vault_tls_path }}/tls.key"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: '0644' 

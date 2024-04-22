@@ -1,0 +1,8 @@
+- name: Restart Vault service
+  ansible.builtin.service:
+    name: vault.service
+    state: restarted
+    enabled: true
+
+- name: Update CA certificates
+  ansible.builtin.command: update-ca-certificates

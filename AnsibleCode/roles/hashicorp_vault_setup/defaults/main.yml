@@ -1,0 +1,13 @@
+vault_install_dependencies: ["unzip"]
+vault_version: "1.15.6"
+vault_os: "linux"
+vault_arch: "amd64"
+vault_download_url: "https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_{{ vault_os }}_{{ vault_arch }}.zip"
+vault_binary_path: /usr/local/bin
+vault_config_path: /etc/vault.d/vault.hcl
+vault_systemd_path: /etc/systemd/system/
+vault_user: "vault"
+vault_group: "vault"
+vault_data_path: /opt/vault/data
+vault_tls_path: /opt/vault/tls
+vault_log_path: /var/log/vault
