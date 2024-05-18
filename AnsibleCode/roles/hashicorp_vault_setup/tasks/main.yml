@@ -109,7 +109,7 @@
     - Restart Vault service
 - name: Copy Node-specific TLS Certificate to each node
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/{{ hostvars[inventory_hostname]['tls_cert_file'] }}"
+    src: "{{ playbook_dir }}/{{ hostvars[inventory_hostname]['tls_cert_file'] }}"    # tls_cert_file must be provided in inventory file
     dest: "{{ vault_tls_path }}/tls.cert"
     owner: "{{ vault_user }}"
     group: "{{ vault_group }}"
@@ -117,7 +117,7 @@
 
 - name: Copy Node-specific TLS private key to each node
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/{{ hostvars[inventory_hostname]['tls_key_file'] }}"
+    src: "{{ playbook_dir }}/{{ hostvars[inventory_hostname]['tls_key_file'] }}"     # tls_key_file must be provided in inventory file
     dest: "{{ vault_tls_path }}/tls.key"
     owner: "{{ vault_user }}"
     group: "{{ vault_group }}"

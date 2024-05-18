@@ -1,6 +1,6 @@
 ## 🌟HashiCorp Vault cluster on AWS with Auto Unseal and TLS🌟
 
-This module use two powerful IaC tools - Terraform and Ansible, to deploy and manage a robust HashiCorp Vault environment on AWS, focusing on simplicity, security, and high availability. 
+This module uses two powerful IaC tools - Terraform and Ansible, to deploy and manage a robust HashiCorp Vault environment on AWS, focusing on simplicity, security, and high availability. 
 
 ### 📋 Overview
 
@@ -56,7 +56,7 @@ resource "local_file" "ansible_inventory_yaml" {      # Simple Dynamic Inventory
 ```
 ### Reflection on Idempotency
 
-Yes, the necessity for Ansible role to have specific parameters (`vault_config_file`, `tls_cert_file`, `tls_key_file`) in the inventory file *violates the principle of idempotency*. However, *despite some negative aspects*, this approach proved to be the *best* solution. `After all — are these tools created for us, or is it us — for the tools?`
+Yes, the necessity for Ansible role to have specific parameters (`vault_config_file`, `tls_cert_file`, `tls_key_file`) in the inventory file *violates the principle of idempotency*. However, *despite this negative aspect*, this approach proved to be the *best* solution. `After all — are these tools created for us, or is it us — for the tools?`
 
 ## 🔥 Required Variables and Configuration 🔥
 
@@ -65,12 +65,20 @@ Before deploying the HashiCorp Vault, ensure you configure the following setting
 ### Configuration Details
 
 | Type | Setting | Description | Action |
-|------|----------|-------------|--------|
-| 🔄 Dynamic (var) | `ssh_key_name` | Specify the SSH key name that is region-specific and configured for your AWS account. The region is dynamically detected in the `main.tf` using `data.aws_region`. | Specify at runtime: `terraform apply -var "ssh_key_name=your-ssh-keyname"` |
-| 🔧 Manual (template)| `vault.hcl.tpl` | Enter the ARN of your AWS KMS key in the Vault configuration template. This key is used for the auto unseal feature. | add ARN of your AWS KMS key directly in template: `/modules/ansible_templates_generator/templates/vault.hcl.tpl` |
+|------|---------|-------------|--------|
+| **Must-Have Configurations** | | | |
+| 🎯  Dynamic (var) | `ssh_key_name` | Specify the SSH key name that is region-specific and configured for your AWS account. The region is dynamically detected in the `main.tf` using `data.aws_region`. | Specify at runtime: `terraform apply -var "ssh_key_name=your-ssh-keyname"` |
+| 🎯  Dynamic (var) | `certificate_arn_lb` | TLS certificate ARN for the Application Load Balancer (ALB). This is critical for HTTPS traffic management to your services. | Specify at runtime: `terraform apply -var "certificate_arn_lb=your-cert-arn"` |
+| 🔧 Manual (template)| `vault.hcl.tpl` | Enter the ARN of your AWS KMS key in the Vault configuration template. This key is used for the auto unseal feature. | Add ARN of your AWS KMS key directly in template: `/modules/ansible_templates_generator/templates/vault.hcl.tpl` |
 | 🔧 Manual (root level)| `backend.tf` | Specify your own S3 bucket where the `vault-nice-cluster.tfstate` will be stored. This setup is critical for managing the state of your Terraform deployments and ensuring data persistence across sessions. | Update the file: `backend.tf` |
+| **Optional Configurations** | | | |
+| 🔄 Default (var) | `vpc_cidr` | VPC module. This is the base CIDR from which subnet CIDRs are derived using formulas. `Defaults` are `10.100.0.0/16`, <br>**Public Subnets**: Formula: `cidr_block = cidrsubnet(var.vpc_cidr, 8, 10 + count.index)`<br>**Private Subnets**: Formula `cidr_block = cidrsubnet(var.vpc_cidr, 8, count.index + 100)` | Defaults are set, but can be overridden at runtime: `terraform apply -var "vpc_cidr=your-vpc-cidr"` |
+| 🔄 Default (var) | `bastion_ec2_count` | Number of EC2 instances for the bastion host. Bastion hosts provide secure access to your private network from the internet. | Default value is `1`, but can be overridden at runtime. |
+| 🔄 Default (var) | `vault_ec2_count` | Number of EC2 instances for running Vault servers. This setup is used to manage the high availability and scalability of Vault within AWS. | Default value is `3`, but can be overridden at runtime. |
 
-Please ensure these settings are properly configured in your Terraform and Ansible files to facilitate a smooth and secure deployment.
+
+
+Please ensure must-have settings are properly configured in your Terraform and Ansible files to facilitate a smooth and secure deployment.
 ## 🔥 Good to Know 🔥
 
 Once you have configured your `backend.tf` and specified your AWS KMS key in `vault.hcl.tpl`, you are almost ready to go. Follow these steps to complete the setup:
@@ -104,16 +112,18 @@ ansible vault -m shell -a 'sudo systemctl restart vault'
 
 - [ ] **User Flexibility**: Enable configuration of user names for Vault and bastion instances beyond the default `ubuntu`.
 
-- [ ] **Subnet and AZ Configuration**: Add opportunity to dynamically specify through variable the number of subnets and AZs. 'Right now you can adjust amount of private subnets in VPC module via **count** mechanism`
+- [x] **Subnet Configuration**: Add opportunity to dynamically specify `through variable` the number of `private` and `public subnets`.
 
 - [ ] **VPC Endpoint**: Add VPC endpoints to provide an extra layer of security within AWS.
 
-- [ ] **Load Balancer for Health Checks**: Plan to implement a load balancer primarily to make monitoring of health checks easier.
+- [x] **Load Balancer for Health Checks**: Plan to implement a load balancer primarily to make monitoring of health checks easier.
 
+- [ ] **Consul**: Implementate Consul
 
-### CIDR Block configuration for subnets?
-- **Private Subnets**: Formula `cidr_block = cidrsubnet(var.vpc_cidr, 8, count.index + 100)`
-- **Public Subnets**: Formula: `cidr_block = cidrsubnet(var.vpc_cidr, 8, 11)`
-
-[![hashi-infra.png](https://i.postimg.cc/zBnHvGdR/hashi-infra.png)](https://postimg.cc/JDzzdMC1)
-
+### In few words?
+- **DNS**: Set up a CNAME record to direct traffic to the load balancer (lb dns name will be printed by Terraform)
+- **Application Load Balancer**: Manages traffic, health checks and hides the Vault cluster behind a «DNS shield»
+- **Bastion host/s**: The only access point for SSH connections to the Vault nodes, configured via Terraform. (those ssh commands also will be printed by Terraform)
+- **Vault Cluster**: Distributed across private subnets, equipped with auto-unseal and TLS for secure operations.
+    
+[![hashi-balancer-infra.png](https://i.postimg.cc/R0v9wm85/hashi-balancer-infra.png)](https://postimg.cc/VJZ3cxmD)

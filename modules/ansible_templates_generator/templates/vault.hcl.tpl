@@ -9,7 +9,7 @@ storage "raft" {
 
 seal "awskms" {
   region = "us-west-2"
-  kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/1234567890xxx0987654321"
+  kms_key_id = "arn:aws:kms:region:your-account-id:key/your-key"
 }
 listener "tcp" {
   address = "0.0.0.0:8200"

@@ -2,8 +2,10 @@ data "aws_region" "current" {}
 
 module "vpc" {
   source = "./modules/vpc"
-
+  
   vpc_cidr = var.vpc_cidr
+  count_public_subnets = var.count_public_subnets
+  count_private_subnets = var.count_private_subnets
 }
 
 module "tls" {
@@ -50,6 +52,18 @@ module "ec2-vault" {
   private_subnet_ids   = module.vpc.private_subnet_ids
 }
 
+module "ALB" {
+  source            = "./modules/ALB"
+  
+  certificate_arn_lb = var.certificate_arn_lb
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+  alb_sg            = module.security_groups.alb_sg_id
+  vault_nodes_ids   = module.ec2-vault.vault_nodes_ids
+}
+
+
+
 module "ansible_templates_generator" {
   source          = "./modules/ansible_templates_generator"
   vault_ec2_count = var.vault_ec2_count
@@ -69,4 +83,8 @@ output "ssh_commands" {
 output "vault_restart_command" {
   value       = "ansible vault -m shell -a 'sudo systemctl restart vault'"
   description = "Restart Vault on nodes. Use after initializing the first node to force all others join the cluster"
+}
+
+output "LB_DNS_name" {
+  value = module.ALB.lb_dns_name
 }

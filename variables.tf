@@ -10,6 +10,19 @@ variable "ssh_key_name" {
   default = "ssh_key"
 }
 
+variable "certificate_arn_lb" {
+  type = string
+  description = "Arn of certificate for load balancer (ACM)"
+  default = "arn:aws:acm:us-west-2:account-id:certificate/123123-certificate"
+}
+variable "count_public_subnets" {
+  type    = number
+  default = 2
+}
+variable "count_private_subnets" {
+  type    = number
+  default = 2
+}
 ### ec2-bastion module 
 variable "bastion_ec2_count" {
   type    = number

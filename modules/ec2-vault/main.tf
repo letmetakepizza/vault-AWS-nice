@@ -22,7 +22,7 @@ resource "aws_instance" "vault_ec2" {
   subnet_id = element(var.private_subnet_ids, count.index % length(var.private_subnet_ids))
   vpc_security_group_ids = [ var.vault_sg_id ]
   
-  associate_public_ip_address = true
+  associate_public_ip_address = false
 
   tags = {
     Name = "Vault_node-${ count.index + 1 }"
